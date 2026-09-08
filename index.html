@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Ayush Kumawat — Civil Engineering Portfolio</title>
+<meta name="description" content="Ayush Kumawat — B.Tech Civil Engineering, VIT Vellore. Structural design, Hyperloop chassis engineering, and applied research." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --concrete:      #b7a688;
+    --concrete-dark: #6b5f4d;
+    --steel:         #55504a;
+    --steel-light:   #8a8177;
+    --glass:         rgba(255, 246, 232, 0.10);
+    --void-1:        #1c130d;
+    --void-2:        #2e1a10;
+    --orange:        #ff5a1f;
+    --amber:         #ffb627;
+    --rust:          #c1440e;
+    --teal:          #29e7cd;
+    --paper:         #f3ebdc;
+    --paper-dim:      rgba(243,235,220,0.62);
+
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body:    'Inter', sans-serif;
+    --font-mono:    'JetBrains Mono', monospace;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html{ background: var(--void-1); }
+
+  body{
+    background: radial-gradient(120% 140% at 50% 0%, var(--void-2) 0%, var(--void-1) 60%, #120c08 100%);
+    color: var(--paper);
+    font-family: var(--font-body);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection{ background: var(--orange); color: #1c130d; }
+
+  a{ color: inherit; }
+
+  /* ---------- fixed 3d stage ---------- */
+  #canvas-root{
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+  }
+  #canvas-root canvas{ display:block; width:100%; height:100%; }
+
+  #canvas-root::after{
+    /* vignette to keep focus on the structure & keep text legible */
+    content:"";
+    position:absolute; inset:0;
+    pointer-events:none;
+    background:
+      radial-gradient(120% 90% at 18% 50%, rgba(20,13,9,0.05) 0%, rgba(18,11,7,0.72) 78%),
+      linear-gradient(to bottom, rgba(18,11,7,0.55) 0%, rgba(18,11,7,0) 16%, rgba(18,11,7,0) 78%, rgba(18,11,7,0.6) 100%);
+  }
+
+  /* ---------- grain ---------- */
+  #grain{
+    position:fixed; inset:0; z-index:5; pointer-events:none;
+    opacity:0.05; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ---------- scroll length driver ---------- */
+  #scroll-spacer{ position:relative; z-index:0; width:1px; }
+
+  /* ---------- HUD ---------- */
+  #hud{
+    position:fixed; inset:0; z-index:4; pointer-events:none;
+    font-family: var(--font-mono);
+  }
+
+  .brandmark{
+    position:absolute; top:28px; left:28px;
+    display:flex; flex-direction:column; gap:2px;
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
+  }
+  .brandmark .name{ font-size:15px; font-weight:600; color:var(--paper); }
+  .brandmark .role{ font-size:10.5px; font-family:var(--font-mono); color:var(--teal); opacity:0.85; letter-spacing:0.03em; }
+
+  .coords{
+    position:absolute; top:28px; right:28px;
+    text-align:right; font-size:10px; color:var(--paper-dim);
+    line-height:1.6;
+  }
+  .coords span{ color:var(--amber); }
+
+  /* elevator-style level index, right side */
+  #levels{
+    position:fixed; right:26px; top:50%; transform:translateY(-50%);
+    z-index:6; pointer-events:auto;
+    display:flex; flex-direction:column; gap:16px;
+    align-items:flex-end;
+  }
+  .level-btn{
+    all:unset; cursor:pointer;
+    display:flex; align-items:center; gap:10px;
+    opacity:0.45; transition:opacity .35s ease;
+  }
+  .level-btn:hover, .level-btn.active{ opacity:1; }
+  .level-btn .lbl{
+    font-family:var(--font-mono); font-size:10px; letter-spacing:0.06em;
+    color:var(--paper-dim); white-space:nowrap;
+  }
+  .level-btn.active .lbl{ color:var(--amber); }
+  .level-btn .dot{
+    width:7px; height:7px; border-radius:1px;
+    border:1px solid var(--steel-light);
+    background:transparent;
+    transform:rotate(45deg);
+    transition: background .35s ease, border-color .35s ease;
+  }
+  .level-btn.active .dot{ background:var(--orange); border-color:var(--orange); box-shadow:0 0 10px rgba(255,90,31,0.8); }
+
+  @media (max-width: 780px){
+    #levels .lbl{ display:none; }
+    #levels{ right:16px; gap:14px; }
+  }
+
+  /* scroll cue */
+  #scrollcue{
+    position:fixed; left:28px; bottom:26px; z-index:4; pointer-events:none;
+    display:flex; align-items:center; gap:10px;
+    font-family:var(--font-mono); font-size:10px; color:var(--paper-dim);
+    letter-spacing:0.08em;
+    transition:opacity .5s ease;
+  }
+  #scrollcue .bar{ width:1px; height:34px; background:linear-gradient(to bottom, var(--teal), transparent); position:relative; overflow:hidden; }
+  #scrollcue .bar::after{
+    content:""; position:absolute; left:0; top:0; width:100%; height:10px; background:var(--amber);
+    animation: cue-fall 1.6s ease-in-out infinite;
+  }
+  @keyframes cue-fall{ 0%{ transform:translateY(-10px);} 100%{ transform:translateY(34px);} }
+
+  /* ---------- panels ---------- */
+  #panels{ position:relative; z-index:3; }
+
+  .panel{
+    position:fixed; inset:0;
+    display:flex; align-items:center;
+    padding: 0 8vw;
+    opacity:0; pointer-events:none;
+    transition: opacity .5s ease;
+  }
+  .panel.visible{ opacity:1; pointer-events:auto; }
+
+  .panel-inner{ max-width:620px; }
+
+  .kicker{
+    display:flex; align-items:center; gap:12px;
+    font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em;
+    color:var(--teal); margin-bottom:22px;
+  }
+  .kicker::before{ content:""; width:26px; height:1px; background:var(--teal); display:block; }
+
+  h1.headline, h2.headline{
+    font-family:var(--font-display);
+    font-weight:600;
+    line-height:1.04;
+    letter-spacing:-0.01em;
+    color:var(--paper);
+  }
+  h1.headline{ font-size:clamp(2.4rem, 5.6vw, 4.6rem); }
+  h2.headline{ font-size:clamp(1.9rem, 4.2vw, 3.2rem); }
+
+  .accent-o{ color:var(--orange); }
+  .accent-a{ color:var(--amber); }
+
+  .lede{
+    margin-top:22px;
+    font-size:clamp(1rem, 1.3vw, 1.18rem);
+    line-height:1.65;
+    color:var(--paper-dim);
+    max-width:52ch;
+  }
+
+  .contact-strip{
+    margin-top:34px;
+    display:flex; flex-wrap:wrap; gap:10px 0;
+    border-top:1px solid rgba(243,235,220,0.18);
+    padding-top:20px;
+  }
+  .contact-strip a, .contact-strip span{
+    font-family:var(--font-mono); font-size:12.5px;
+    color:var(--paper);
+    display:flex; align-items:center; gap:8px;
+    padding-right:20px; margin-right:20px;
+    border-right:1px solid rgba(243,235,220,0.18);
+    text-decoration:none;
+  }
+  .contact-strip a:last-child, .contact-strip span:last-child{ border-right:none; margin-right:0; padding-right:0;}
+  .contact-strip a:hover{ color:var(--amber); }
+  .contact-strip svg{ width:14px; height:14px; stroke:var(--orange); flex-shrink:0; }
+
+  /* spec list (education / stack) */
+  .spec-list{ margin-top:30px; display:flex; flex-direction:column; gap:0; }
+  .spec-row{
+    display:grid; grid-template-columns:26px 1fr auto;
+    align-items:baseline; gap:16px;
+    padding:14px 0;
+    border-top:1px solid rgba(243,235,220,0.14);
+  }
+  .spec-row:last-child{ border-bottom:1px solid rgba(243,235,220,0.14); }
+  .spec-row .idx{ font-family:var(--font-mono); font-size:11px; color:var(--rust); }
+  .spec-row .main{ font-family:var(--font-display); font-size:16px; color:var(--paper); font-weight:500; }
+  .spec-row .sub{ font-family:var(--font-mono); font-size:11px; color:var(--paper-dim); text-align:right; white-space:nowrap; }
+
+  /* project cards (experience / hyperloop) */
+  .proj{
+    margin-top:26px; padding:20px 0 20px 20px;
+    border-left:2px solid var(--rust);
+    position:relative;
+  }
+  .proj + .proj{ margin-top:18px; }
+  .proj .tag{
+    font-family:var(--font-mono); font-size:10px; letter-spacing:0.08em;
+    color:var(--amber); margin-bottom:8px; display:block;
+  }
+  .proj h3{
+    font-family:var(--font-display); font-weight:600; font-size:1.18rem;
+    color:var(--paper); margin-bottom:8px;
+  }
+  .proj p{ font-size:14px; line-height:1.6; color:var(--paper-dim); max-width:48ch; }
+
+  /* trophy list */
+  .trophy-list{ margin-top:30px; display:flex; flex-direction:column; gap:20px; }
+  .trophy-item{ display:flex; gap:16px; align-items:flex-start; }
+  .trophy-item svg{ width:22px; height:22px; stroke:var(--amber); flex-shrink:0; margin-top:3px; }
+  .trophy-item .t-main{ font-family:var(--font-display); font-weight:600; font-size:16px; color:var(--paper); }
+  .trophy-item .t-sub{ font-family:var(--font-body); font-size:13.5px; color:var(--paper-dim); margin-top:3px; line-height:1.5; }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:var(--font-mono); font-size:10px; letter-spacing:0.06em;
+    color:var(--orange); border:1px solid rgba(255,90,31,0.4);
+    padding:4px 9px; margin-top:4px; border-radius:2px;
+  }
+
+  /* closing panel */
+  .closing{ text-align:left; }
+  .closing .lede{ max-width:44ch; }
+  .cta-row{ margin-top:32px; display:flex; gap:14px; flex-wrap:wrap; }
+  .cta{
+    font-family:var(--font-mono); font-size:12px; letter-spacing:0.04em;
+    padding:14px 22px; border:1px solid var(--orange); color:var(--paper);
+    text-decoration:none; display:inline-flex; align-items:center; gap:10px;
+    background:rgba(255,90,31,0.08);
+    transition: background .3s ease, color .3s ease;
+  }
+  .cta:hover{ background:var(--orange); color:#1c130d; }
+  .cta.ghost{ border-color:rgba(243,235,220,0.3); background:transparent; }
+  .cta.ghost:hover{ background:rgba(243,235,220,0.1); color:var(--paper); }
+
+  @media (max-width: 780px){
+    .panel{ padding:0 6vw; align-items:flex-end; padding-bottom:14vh; }
+    .contact-strip a, .contact-strip span{ padding-right:14px; margin-right:14px; }
+  }
+
+  /* ---------- loader ---------- */
+  #loader{
+    position:fixed; inset:0; z-index:50;
+    background: var(--void-1);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px;
+    transition: opacity .8s ease, visibility .8s ease;
+  }
+  #loader .mark{ font-family:var(--font-display); font-size:14px; letter-spacing:0.1em; color:var(--paper-dim); }
+  #loader .track{ width:220px; height:2px; background:rgba(243,235,220,0.15); position:relative; overflow:hidden; }
+  #loader .fill{ position:absolute; left:0; top:0; height:100%; width:0%; background:linear-gradient(90deg, var(--rust), var(--orange), var(--amber)); }
+  #loader.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
+
+  #noscript-note{ display:none; }
+  @media (prefers-reduced-motion: reduce){
+    #scrollcue .bar::after{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="mark">AK / CIVIL — ASSEMBLING STRUCTURE</div>
+  <div class="track"><div class="fill" id="loader-fill"></div></div>
+</div>
+
+<div id="canvas-root"></div>
+<div id="grain"></div>
+
+<div id="hud">
+  <div class="brandmark">
+    <span class="name">AYUSH KUMAWAT</span>
+    <span class="role">B.TECH CIVIL ENGINEERING</span>
+  </div>
+  <div class="coords">
+    STRUCTURE <span id="hud-level">L00</span><br/>
+    <span id="hud-section">ENTRY LEVEL</span>
+  </div>
+  <div id="scrollcue"><div class="bar"></div><span>SCROLL</span></div>
+</div>
+
+<div id="levels"></div>
+
+<div id="panels">
+
+  <!-- 0 : HERO / CONTACT -->
+  <section class="panel" data-index="0">
+    <div class="panel-inner">
+      <div class="kicker">L00 — ENTRY LEVEL / SITE PLAN</div>
+      <h1 class="headline">Ayush Kumawat<br/><span class="accent-o">builds</span> before he draws it twice.</h1>
+      <p class="lede">B.Tech Civil Engineering student at VIT Vellore. I'm looking for hands-on, practical work where structural theory meets the actual job site — not another spreadsheet.</p>
+      <div class="contact-strip">
+        <span>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg>
+          Jaipur, India
+        </span>
+        <a href="tel:+916350624065">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v4a2 2 0 0 1-2 2C9.6 21 3 14.4 3 6a2 2 0 0 1 2-2z"/></svg>
+          6350624065
+        </a>
+        <a href="mailto:ayush.jalindra@gmail.com">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6.5l9 6.5 9-6.5"/></svg>
+          ayush.jalindra@gmail.com
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1 : EDUCATION + STACK -->
+  <section class="panel" data-index="1">
+    <div class="panel-inner">
+      <div class="kicker">L01 — DRAFTING FLOOR / EDUCATION</div>
+      <h2 class="headline">Trained on paper, <span class="accent-a">tested on the model.</span></h2>
+      <div class="spec-list">
+        <div class="spec-row"><span class="idx">ED</span><span class="main">VIT Vellore — B.Tech, Civil Engineering</span><span class="sub">CLASS OF 2029</span></div>
+        <div class="spec-row"><span class="idx">ED</span><span class="main">Excellence English Academy</span><span class="sub">PRIOR SCHOOLING</span></div>
+        <div class="spec-row"><span class="idx">01</span><span class="main">AutoCAD</span><span class="sub">2D drafting &amp; site plans</span></div>
+        <div class="spec-row"><span class="idx">02</span><span class="main">Revit</span><span class="sub">BIM &amp; structural modeling</span></div>
+        <div class="spec-row"><span class="idx">03</span><span class="main">Fusion 360</span><span class="sub">3D CAD &amp; mechanical design</span></div>
+        <div class="spec-row"><span class="idx">04</span><span class="main">ANSYS</span><span class="sub">structural &amp; stress simulation</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 : EXPERIENCE -->
+  <section class="panel" data-index="2">
+    <div class="panel-inner">
+      <div class="kicker">L02 — RESEARCH WING</div>
+      <h2 class="headline">Where <span class="accent-o">data</span> meets the mix design.</h2>
+      <div class="proj">
+        <span class="tag">APPLIED ML</span>
+        <h3>Concrete Strength Prediction</h3>
+        <p>Trained a machine learning model to predict concrete compressive strength directly from mix-design parameters — pairing materials science with data-driven design.</p>
+      </div>
+      <div class="proj">
+        <span class="tag">COMPUTER VISION</span>
+        <h3>CCTV Traffic Volume Study</h3>
+        <p>Analyzed CCTV footage to measure and model traffic volume patterns, applying vision-based methods to real transportation-engineering questions.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 : HYPERLOOP -->
+  <section class="panel" data-index="3">
+    <div class="panel-inner">
+      <div class="kicker">L03 — FABRICATION BAY / TEAM LEVITATE</div>
+      <h2 class="headline">Chassis for a pod that runs at <span class="accent-a">1000 km/h.</span></h2>
+      <div class="proj">
+        <span class="tag">JUNIOR CORE MEMBER</span>
+        <h3>Team Levitate — Hyperloop</h3>
+        <p>Working on structural design of the pod chassis and evaluating track materials for a vacuum-tube transport system — structural engineering at the edge of what's been built.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 : TROPHY ROOM -->
+  <section class="panel" data-index="4">
+    <div class="panel-inner">
+      <div class="kicker">L04 — PENTHOUSE / TROPHY ROOM</div>
+      <h2 class="headline">Proof, <span class="accent-o">stamped and certified.</span></h2>
+      <div class="trophy-list">
+        <div class="trophy-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 5H4a3 3 0 0 0 3 5M17 5h3a3 3 0 0 1-3 5"/></svg>
+          <div>
+            <div class="t-main">CEA Fest 2026 — IIT Madras</div>
+            <div class="t-sub">Competed across four events at the Civil Engineering Association fest.</div>
+          </div>
+        </div>
+        <div class="trophy-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M8.5 14.5L7 22l5-2.5 5 2.5-1.5-7.5"/></svg>
+          <div>
+            <div class="t-main">Winner — DesignForge</div>
+            <div class="t-sub">First place, Revit-based design competition.</div>
+            <span class="badge">1ST PLACE</span>
+          </div>
+        </div>
+        <div class="trophy-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1z"/><path d="M9 8h6M9 11h6"/></svg>
+          <div>
+            <div class="t-main">Academic Appreciation Certificates</div>
+            <div class="t-sub">Recognized for consistent academic performance.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 : CLOSING -->
+  <section class="panel" data-index="5">
+    <div class="panel-inner closing">
+      <div class="kicker">L05 — ROOF ACCESS / CONTACT</div>
+      <h2 class="headline">Let's <span class="accent-a">build</span> something real.</h2>
+      <p class="lede">Open to internships, site work, and research collaborations — anywhere structural design meets practical execution.</p>
+      <div class="cta-row">
+        <a class="cta" href="mailto:ayush.jalindra@gmail.com">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6.5l9 6.5 9-6.5"/></svg>
+          ayush.jalindra@gmail.com
+        </a>
+        <a class="cta ghost" href="tel:+916350624065">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v4a2 2 0 0 1-2 2C9.6 21 3 14.4 3 6a2 2 0 0 1 2-2z"/></svg>
+          +91 63506 24065
+        </a>
+      </div>
+      <div class="contact-strip" style="margin-top:44px;">
+        <span>Jaipur, India</span>
+        <span>VIT Vellore, Class of 2029</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div id="scroll-spacer"></div>
+
+<noscript><div id="noscript-note" style="display:block;position:fixed;inset:0;z-index:99;background:#1c130d;color:#f3ebdc;display:flex;align-items:center;justify-content:center;padding:2rem;text-align:center;font-family:sans-serif;">This portfolio needs JavaScript and WebGL enabled to render the 3D structure.</div></noscript>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+/* ============================================================
+   0. SETUP
+   ============================================================ */
+const SECTIONS = [
+  { id:0, label:"ENTRY LEVEL",    short:"L00" },
+  { id:1, label:"DRAFTING FLOOR", short:"L01" },
+  { id:2, label:"RESEARCH WING",  short:"L02" },
+  { id:3, label:"FABRICATION BAY",short:"L03" },
+  { id:4, label:"TROPHY ROOM",    short:"L04" },
+  { id:5, label:"ROOF ACCESS",    short:"L05" },
+];
+const N = SECTIONS.length;
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const canvasRoot = document.getElementById("canvas-root");
+const scrollSpacer = document.getElementById("scroll-spacer");
+scrollSpacer.style.height = (N * 100) + "vh";
+
+/* ============================================================
+   1. RENDERER / SCENE / CAMERA
+   ============================================================ */
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:"high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+canvasRoot.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x1c130d, 0.014);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 300);
+camera.position.set(0, 8, 34);
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+/* ============================================================
+   2. PROCEDURAL PBR-STYLE TEXTURES (canvas-based, no network)
+   ============================================================ */
+function noiseCanvas(size, draw){
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d");
+  draw(ctx, size);
+  return c;
+}
+
+function makeConcreteMaps(size=512){
+  const base = noiseCanvas(size, (ctx, s) => {
+    ctx.fillStyle = "#b7a688";
+    ctx.fillRect(0,0,s,s);
+    for(let i=0;i<26000;i++){
+      const x = Math.random()*s, y = Math.random()*s;
+      const v = Math.random();
+      const shade = 150 + (v-0.5)*90;
+      ctx.fillStyle = `rgba(${shade+22},${shade+8},${shade-22},${0.05+Math.random()*0.12})`;
+      const r = Math.random()*1.6+0.2;
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    }
+    // subtle blotches / stains
+    for(let i=0;i<18;i++){
+      const x=Math.random()*s, y=Math.random()*s, r=30+Math.random()*90;
+      const g = ctx.createRadialGradient(x,y,0,x,y,r);
+      g.addColorStop(0, "rgba(70,50,30,0.10)");
+      g.addColorStop(1, "rgba(70,50,30,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    }
+    // hairline formwork joints
+    ctx.strokeStyle = "rgba(60,45,30,0.18)"; ctx.lineWidth = 1.5;
+    for(let i=1;i<4;i++){ const yy = (s/4)*i; ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(s,yy); ctx.stroke(); }
+  });
+
+  const rough = noiseCanvas(size, (ctx, s) => {
+    ctx.fillStyle = "#a9a9a9"; ctx.fillRect(0,0,s,s);
+    for(let i=0;i<40000;i++){
+      const x=Math.random()*s, y=Math.random()*s;
+      const v = 120+Math.random()*110;
+      ctx.fillStyle = `rgba(${v},${v},${v},0.5)`;
+      ctx.fillRect(x,y,1.4,1.4);
+    }
+  });
+
+  const colorMap = new THREE.CanvasTexture(base);
+  colorMap.colorSpace = THREE.SRGBColorSpace;
+  const roughMap = new THREE.CanvasTexture(rough);
+  [colorMap, roughMap].forEach(t=>{ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2,2); });
+  return { map: colorMap, roughnessMap: roughMap };
+}
+
+function makeSteelMaps(size=512){
+  const base = noiseCanvas(size, (ctx, s) => {
+    const g = ctx.createLinearGradient(0,0,0,s);
+    g.addColorStop(0, "#8a8177"); g.addColorStop(0.5,"#5c554c"); g.addColorStop(1,"#6d655a");
+    ctx.fillStyle = g; ctx.fillRect(0,0,s,s);
+    ctx.globalAlpha = 0.5;
+    for(let y=0;y<s;y+=1){
+      const shade = 120 + Math.sin(y*0.9)*10 + (Math.random()-0.5)*22;
+      ctx.strokeStyle = `rgba(${shade+18},${shade+14},${shade+8},0.35)`;
+      ctx.beginPath(); ctx.moveTo(0,y+ (Math.random()-0.5)*1); ctx.lineTo(s,y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    const hl = ctx.createLinearGradient(0,0,s,0);
+    hl.addColorStop(0,"rgba(255,255,255,0)"); hl.addColorStop(0.5,"rgba(255,255,255,0.10)"); hl.addColorStop(1,"rgba(255,255,255,0)");
+    ctx.fillStyle = hl; ctx.fillRect(0,0,s,s);
+  });
+  const rough = noiseCanvas(size, (ctx, s) => {
+    ctx.fillStyle = "#3a3a3a"; ctx.fillRect(0,0,s,s);
+    for(let y=0;y<s;y+=1){
+      const v = 40+Math.random()*40;
+      ctx.strokeStyle = `rgba(${v},${v},${v},0.6)`;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(s,y); ctx.stroke();
+    }
+  });
+  const colorMap = new THREE.CanvasTexture(base);
+  colorMap.colorSpace = THREE.SRGBColorSpace;
+  const roughMap = new THREE.CanvasTexture(rough);
+  [colorMap, roughMap].forEach(t=>{ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(1,3); });
+  return { map: colorMap, roughnessMap: roughMap };
+}
+
+const concreteMaps = makeConcreteMaps();
+const steelMaps = makeSteelMaps();
+
+const matConcrete = new THREE.MeshStandardMaterial({
+  ...concreteMaps, roughness:1, metalness:0.02, envMapIntensity:0.7
+});
+const matSteel = new THREE.MeshStandardMaterial({
+  ...steelMaps, roughness:0.42, metalness:0.92, envMapIntensity:1.3
+});
+const matSteelDark = new THREE.MeshStandardMaterial({
+  color:0x2c2822, roughness:0.5, metalness:0.85, envMapIntensity:1.1
+});
+const matGlass = new THREE.MeshPhysicalMaterial({
+  color:0xfff3df, roughness:0.06, metalness:0, transmission:0.92, thickness:0.4,
+  ior:1.4, envMapIntensity:1.2, transparent:true, opacity:0.55, clearcoat:0.4
+});
+const matGlassFloor = matGlass.clone(); matGlassFloor.opacity = 0.35; matGlassFloor.transmission=0.85;
+
+const accentColors = [0xff5a1f, 0xffb627, 0x29e7cd, 0xc1440e, 0xffb627, 0xff5a1f];
+
+/* ============================================================
+   3. THE STRUCTURE — a twisted stacked tower ("perspective puzzle")
+   ============================================================ */
+const tower = new THREE.Group();
+scene.add(tower);
+
+const LEVEL_H = 6.4;
+const levelGroups = [];
+
+function buildLevel(i){
+  const g = new THREE.Group();
+  const radius = 7.6 - i*0.55;
+  const twist = i * 16 * (Math.PI/180);
+  g.rotation.y = twist;
+  g.position.y = i * LEVEL_H;
+
+  // floor slab
+  const floorGeo = new THREE.CylinderGeometry(radius, radius, 0.55, 8, 1);
+  const floor = new THREE.Mesh(floorGeo, matConcrete);
+  floor.castShadow = true; floor.receiveShadow = true;
+  g.add(floor);
+
+  // columns
+  const colCount = 8;
+  const colGeo = new THREE.CylinderGeometry(0.24, 0.24, LEVEL_H, 14);
+  for(let c=0;c<colCount;c++){
+    const a = (c/colCount) * Math.PI * 2;
+    const col = new THREE.Mesh(colGeo, matSteel);
+    col.position.set(Math.cos(a)*radius*0.94, LEVEL_H/2, Math.sin(a)*radius*0.94);
+    col.castShadow = true; col.receiveShadow = true;
+    g.add(col);
+  }
+
+  // glass curtain wall segments between alternating columns
+  for(let c=0;c<colCount;c++){
+    const a0 = (c/colCount) * Math.PI * 2;
+    const a1 = ((c+1)/colCount) * Math.PI * 2;
+    const mid = (a0+a1)/2;
+    const seg = new THREE.Mesh(
+      new THREE.BoxGeometry(radius*0.7, LEVEL_H*0.72, 0.08),
+      matGlass
+    );
+    seg.position.set(Math.cos(mid)*radius*0.94, LEVEL_H*0.5, Math.sin(mid)*radius*0.94);
+    seg.lookAt(0, seg.position.y, 0);
+    g.add(seg);
+  }
+
+  // steel ring beam near top of level
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(radius*0.94, 0.09, 8, colCount*3),
+    matSteelDark
+  );
+  ring.rotation.x = Math.PI/2;
+  ring.position.y = LEVEL_H*0.94;
+  g.add(ring);
+
+  // accent spec-light beam (vibrant color per level)
+  const accent = new THREE.Mesh(
+    new THREE.BoxGeometry(radius*1.7, 0.06, 0.06),
+    new THREE.MeshBasicMaterial({ color: accentColors[i % accentColors.length] })
+  );
+  accent.position.y = 0.32;
+  g.add(accent);
+
+  const pl = new THREE.PointLight(accentColors[i % accentColors.length], 6, radius*3.4, 2);
+  pl.position.set(0, LEVEL_H*0.55, 0);
+  g.add(pl);
+
+  tower.add(g);
+  return g;
+}
+
+for(let i=0;i<N;i++){ levelGroups.push(buildLevel(i)); }
+
+// central steel core running through all levels
+const core = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.6, 0.7, LEVEL_H*N + 3, 16),
+  matSteelDark
+);
+core.position.y = (LEVEL_H*(N-1))/2;
+core.castShadow = true;
+tower.add(core);
+
+// glass dome + trophies on the top level (trophy room)
+const topY = (N-1)*LEVEL_H;
+const dome = new THREE.Mesh(
+  new THREE.SphereGeometry(4.4, 24, 16, 0, Math.PI*2, 0, Math.PI/2),
+  matGlass
+);
+dome.position.y = topY + 0.28;
+tower.add(dome);
+
+function makeTrophy(x, z, colorHex, h=1.6){
+  const grp = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.6,0.18,10), matSteel);
+  grp.add(base);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,h,8), matSteelDark);
+  stem.position.y = h/2+0.09;
+  grp.add(stem);
+  const cup = new THREE.Mesh(new THREE.ConeGeometry(0.34,0.5,16,1,true), new THREE.MeshStandardMaterial({color:colorHex, metalness:0.9, roughness:0.28, envMapIntensity:1.3}));
+  cup.rotation.x = Math.PI;
+  cup.position.y = h+0.09+0.25;
+  grp.add(cup);
+  grp.position.set(x, 0.3, z);
+  return grp;
+}
+const trophyBay = new THREE.Group();
+trophyBay.add(makeTrophy(-2.4, 1.6, 0xffb627, 1.3));
+trophyBay.add(makeTrophy(0, 2.6, 0xff5a1f, 1.9));
+trophyBay.add(makeTrophy(2.4, 1.6, 0x29e7cd, 1.1));
+trophyBay.position.y = topY + 0.55;
+tower.add(trophyBay);
+
+// ground concrete plaza
+const plaza = new THREE.Mesh(new THREE.CylinderGeometry(24, 24, 1, 48), matConcrete);
+plaza.position.y = -0.9;
+plaza.receiveShadow = true;
+scene.add(plaza);
+
+/* floating dust motes for atmosphere */
+const moteGeo = new THREE.BufferGeometry();
+const moteCount = 300;
+const motePos = new Float32Array(moteCount*3);
+for(let i=0;i<moteCount;i++){
+  motePos[i*3]   = (Math.random()-0.5)*40;
+  motePos[i*3+1] = Math.random()*40 - 4;
+  motePos[i*3+2] = (Math.random()-0.5)*40;
+}
+moteGeo.setAttribute("position", new THREE.BufferAttribute(motePos,3));
+const motes = new THREE.Points(moteGeo, new THREE.PointsMaterial({ color:0xffdca8, size:0.045, transparent:true, opacity:0.35 }));
+scene.add(motes);
+
+/* ============================================================
+   4. LIGHTING
+   ============================================================ */
+const hemi = new THREE.HemisphereLight(0xffd9a8, 0x2a1710, 0.65);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xffb27a, 2.1);
+sun.position.set(18, 30, 12);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
+sun.shadow.camera.top = 30; sun.shadow.camera.bottom = -30;
+sun.shadow.camera.far = 80;
+sun.shadow.bias = -0.0015;
+scene.add(sun);
+
+const rim = new THREE.DirectionalLight(0x29e7cd, 0.6);
+rim.position.set(-16, 10, -14);
+scene.add(rim);
+
+/* ============================================================
+   5. SCROLL-DRIVEN CAMERA PATH
+   ============================================================ */
+function levelTarget(i){
+  const y = Math.min(i, N-1) * LEVEL_H + LEVEL_H*0.45;
+  return new THREE.Vector3(0, y, 0);
+}
+function levelCamPos(i, angleOffset){
+  const radius = 12.5 - i*0.4;
+  const y = i*LEVEL_H + LEVEL_H*0.85;
+  const a = i*0.9 + angleOffset;
+  return new THREE.Vector3(Math.cos(a)*radius, y, Math.sin(a)*radius);
+}
+
+const posPoints = [];
+const lookPoints = [];
+for(let i=0;i<N;i++){
+  posPoints.push(levelCamPos(i, 0));
+  posPoints.push(levelCamPos(i, 0.55));
+  lookPoints.push(levelTarget(i));
+  lookPoints.push(levelTarget(i));
+}
+// wide establishing point before entry, and pulled-back finale
+posPoints.unshift(new THREE.Vector3(0, 6, 30));
+lookPoints.unshift(levelTarget(0));
+posPoints.push(levelCamPos(N-1, 1.4).setY((N-1)*LEVEL_H + 9).multiplyScalar(1).add(new THREE.Vector3(0,0,0)));
+lookPoints.push(levelTarget(N-1));
+
+const posCurve = new THREE.CatmullRomCurve3(posPoints, false, "catmullrom", 0.4);
+const lookCurve = new THREE.CatmullRomCurve3(lookPoints, false, "catmullrom", 0.4);
+
+let targetProgress = 0;
+let smoothProgress = 0;
+const tmpPos = new THREE.Vector3();
+const tmpLook = new THREE.Vector3();
+const currentLook = new THREE.Vector3(0, LEVEL_H*0.45, 0);
+
+function updateScrollProgress(){
+  const max = scrollSpacer.offsetHeight - window.innerHeight;
+  const y = window.scrollY || window.pageYOffset;
+  targetProgress = max > 0 ? Math.min(Math.max(y / max, 0), 1) : 0;
+}
+window.addEventListener("scroll", updateScrollProgress, { passive:true });
+updateScrollProgress();
+
+/* ============================================================
+   6. UI: HUD + level nav + panel fades
+   ============================================================ */
+const levelsNav = document.getElementById("levels");
+SECTIONS.forEach((s, i) => {
+  const btn = document.createElement("button");
+  btn.className = "level-btn";
+  btn.dataset.index = i;
+  btn.innerHTML = `<span class="lbl">${s.short}</span><span class="dot"></span>`;
+  btn.addEventListener("click", () => {
+    const max = scrollSpacer.offsetHeight - window.innerHeight;
+    window.scrollTo({ top: (i/(N-1)) * max, behavior: reducedMotion ? "auto" : "smooth" });
+  });
+  levelsNav.appendChild(btn);
+});
+const levelBtns = [...levelsNav.querySelectorAll(".level-btn")];
+const panels = [...document.querySelectorAll(".panel")];
+const hudLevel = document.getElementById("hud-level");
+const hudSection = document.getElementById("hud-section");
+const scrollCue = document.getElementById("scrollcue");
+
+function updateUI(sectionFloat){
+  const nearest = Math.round(sectionFloat);
+  levelBtns.forEach((b,i)=> b.classList.toggle("active", i===nearest));
+  hudLevel.textContent = SECTIONS[nearest].short;
+  hudSection.textContent = SECTIONS[nearest].label;
+  panels.forEach((p,i)=>{
+    const dist = Math.abs(sectionFloat - i);
+    p.classList.toggle("visible", dist < 0.5);
+  });
+  scrollCue.style.opacity = sectionFloat < 0.08 ? 1 : 0;
+}
+
+/* ============================================================
+   7. RESIZE
+   ============================================================ */
+function onResize(){
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  updateScrollProgress();
+}
+window.addEventListener("resize", onResize);
+
+/* ============================================================
+   8. RENDER LOOP
+   ============================================================ */
+const clock = new THREE.Clock();
+const curveParamOf = (p) => {
+  // map 0..1 progress across the full point sequence (accounting for the
+  // extra establishing + finale points added at each end)
+  const totalSpan = posPoints.length - 1;
+  const startPad = 1;      // establishing shot point
+  const usable = totalSpan - startPad - 1; // minus finale point
+  return (startPad + p*usable) / totalSpan;
+};
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+
+  const lerpSpeed = reducedMotion ? 1 : 1 - Math.pow(0.001, dt);
+  smoothProgress += (targetProgress - smoothProgress) * lerpSpeed;
+
+  const t = curveParamOf(smoothProgress);
+  posCurve.getPoint(Math.min(Math.max(t,0),1), tmpPos);
+  lookCurve.getPoint(Math.min(Math.max(t,0),1), tmpLook);
+  camera.position.copy(tmpPos);
+  currentLook.lerp(tmpLook, reducedMotion ? 1 : Math.min(1, dt*3));
+  camera.lookAt(currentLook);
+  camera.fov = 42 - Math.sin(smoothProgress*Math.PI)*4;
+  camera.updateProjectionMatrix();
+
+  if(!reducedMotion){
+    tower.rotation.y += dt * 0.028;
+    motes.rotation.y += dt * 0.01;
+  }
+
+  const sectionFloat = smoothProgress * (N-1);
+  updateUI(sectionFloat);
+
+  renderer.render(scene, camera);
+}
+
+/* ============================================================
+   9. LOADER
+   ============================================================ */
+const loader = document.getElementById("loader");
+const loaderFill = document.getElementById("loader-fill");
+let fake = 0;
+const loadTimer = setInterval(()=>{
+  fake += Math.random()*18;
+  loaderFill.style.width = Math.min(fake,100)+"%";
+  if(fake>=100){
+    clearInterval(loadTimer);
+    setTimeout(()=> loader.classList.add("hidden"), 250);
+  }
+}, 110);
+
+updateUI(0);
+animate();
+</script>
+</body>
+</html>
